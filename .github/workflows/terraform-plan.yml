@@ -4,11 +4,11 @@
 # - 公開リポジトリのログにアカウントIDやメールアドレスを出さない
 name: terraform-plan
 
+# paths で絞らず、すべてのプルリクエストで動かす。
+# main の保護で「plan と Checkov の成功」を必須にしているため、
+# 文書だけの PR でジョブが動かないと、いつまでもマージできなくなる。
 on:
   pull_request:
-    paths:
-      - "terraform/**"
-      - ".github/workflows/terraform-plan.yml"
 
 permissions:
   contents: read
