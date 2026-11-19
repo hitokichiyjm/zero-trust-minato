@@ -77,14 +77,8 @@ variable "anomaly_threshold_usd" {
   default     = 5
 }
 
-variable "create_anomaly_monitor" {
-  description = "サービス別のコスト異常モニターを作るか。すでにある場合は false にして、existing_anomaly_monitor_arn を指定する"
-  type        = bool
-  default     = true
-}
-
-variable "existing_anomaly_monitor_arn" {
-  description = "既にあるコスト異常モニターの ARN(create_anomaly_monitor = false のとき)"
+variable "anomaly_monitor_name" {
+  description = "サービス別のコスト異常モニターの名前。AWS が自動で作ったものを取り込む場合は、その名前に合わせる"
   type        = string
-  default     = ""
+  default     = "Default-Services-Monitor"
 }

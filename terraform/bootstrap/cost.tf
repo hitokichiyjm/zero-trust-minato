@@ -30,15 +30,12 @@ resource "aws_budgets_budget" "monthly_total" {
 # コスト異常検出:いつもと違う費用の増え方を、サービスごとに見つける
 resource "aws_ce_anomaly_monitor" "services" {
   provider = aws.us_east_1
-  count    = var.create_anomaly_monitor ? 1 : 0
 
-  name              = "${var.project}-services"
+  # 新しいアカウントには、AWS が自動でサービス別のモニターを作っている(同じ種類は1つしか作れない)。
+  # その場合は作らずに、既存のものを Terraform に取り込んで(import)管理する。手順は P0 の構築手順 4-2。
+  name              = var.anomaly_monitor_name
   monitor_type      = "DIMENSIONAL"
   monitor_dimension = "SERVICE"
-}
-
-locals {
-  anomaly_monitor_arn = var.create_anomaly_monitor ? aws_ce_anomaly_monitor.services[0].arn : var.existing_anomaly_monitor_arn
 }
 
 resource "aws_ce_anomaly_subscription" "daily_email" {
@@ -46,7 +43,7 @@ resource "aws_ce_anomaly_subscription" "daily_email" {
 
   name             = "${var.project}-daily-email"
   frequency        = "DAILY"
-  monitor_arn_list = [local.anomaly_monitor_arn]
+  monitor_arn_list = [aws_ce_anomaly_monitor.services.arn]
 
   subscriber {
     type    = "EMAIL"
@@ -58,13 +55,6 @@ resource "aws_ce_anomaly_subscription" "daily_email" {
       key           = "ANOMALY_TOTAL_IMPACT_ABSOLUTE"
       match_options = ["GREATER_THAN_OR_EQUAL"]
       values        = [tostring(var.anomaly_threshold_usd)]
-    }
-  }
-
-  lifecycle {
-    precondition {
-      condition     = local.anomaly_monitor_arn != ""
-      error_message = "create_anomaly_monitor = false のときは existing_anomaly_monitor_arn を指定してください。"
     }
   }
 }
