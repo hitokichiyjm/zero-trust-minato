@@ -24,7 +24,7 @@
 ## 進み具合
 | フェーズ | 内容 | 状態 |
 |---|---|---|
-| P0 準備 | 費用アラート、秘密情報の検査、Terraform の土台(状態ファイル、GitHub OIDC) | 構築中 |
+| P0 準備 | 費用アラート、秘密情報の検査、Terraform の土台(状態ファイル、GitHub OIDC) | 完了([作業記録](ops-log/2026-11_P0.md)) |
 | P1 最小構成 | マルチアカウント、SSO + MFA、検知、通知と自動対応 | 未着手 |
 | P2 完成形 | ZTNA、ログ集約、ダッシュボードとエスカレーション | 未着手 |
 | P3 追加 | RISKEN、ハイブリッド接続 | 未着手 |
@@ -35,6 +35,7 @@ docs/                 設計書
 docs/build/           フェーズごとの構築手順
 terraform/bootstrap/  状態ファイル用 S3、GitHub OIDC、費用アラート
 .github/workflows/    terraform plan と Checkov(plan のみ。apply は手元から)
+ops-log/              作業記録(つまずいたことと対応を含む)
 ```
 
 ## 秘密情報の扱い
