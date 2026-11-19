@@ -1,4 +1,4 @@
-# 認証情報はコードに書かない。手元では AWS_PROFILE(SSO のプロファイル)、
+# 認証情報はコードに書かない(CI の動作確認)。手元では AWS_PROFILE(SSO のプロファイル)、
 # GitHub Actions では OIDC で受け取った一時的な認証情報を使う。
 provider "aws" {
   region = var.aws_region
