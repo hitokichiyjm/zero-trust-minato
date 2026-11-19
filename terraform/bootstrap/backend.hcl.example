@@ -1,0 +1,2 @@
+# このファイルを backend.hcl にコピーして、terraform output tfstate_bucket の値を入れる
+bucket = "zero-trust-minato-tfstate-xxxxxxxx"
