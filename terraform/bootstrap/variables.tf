@@ -30,6 +30,26 @@ variable "github_repository" {
   }
 }
 
+variable "github_owner_id" {
+  description = "GitHub のリポジトリの持ち主のID(数字)。gh api users/<owner> --jq .id で確認できる"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.github_owner_id))
+    error_message = "数字で指定してください。"
+  }
+}
+
+variable "github_repository_id" {
+  description = "GitHub のリポジトリのID(数字)。gh api repos/<owner>/<repo> --jq .id で確認できる"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9]+$", var.github_repository_id))
+    error_message = "数字で指定してください。"
+  }
+}
+
 variable "notification_email" {
   description = "費用アラートの送り先"
   type        = string

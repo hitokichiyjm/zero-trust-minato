@@ -1,6 +1,8 @@
 # このファイルを terraform.tfvars にコピーして値を入れる(terraform.tfvars は Git に入らない)
 management_account_id = "123456789012"
 github_repository     = "your-github-name/zero-trust-minato"
+github_owner_id       = "12345678"   # gh api users/<owner> --jq .id
+github_repository_id  = "987654321"  # gh api repos/<owner>/<repo> --jq .id
 notification_email    = "you@example.com"
 
 # 既にサービス別のコスト異常モニターがある場合は、次の2行を使う

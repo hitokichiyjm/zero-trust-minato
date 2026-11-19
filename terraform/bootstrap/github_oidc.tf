@@ -1,6 +1,16 @@
 # GitHub Actions から、アクセスキーなしで AWS に入るための設定(NFR-SEC-02, NFR-SEC-06)
 # このロールは terraform plan 専用で、読み取りしかできない(apply は手元から SSO で行う。DOC-03 12.2)
 
+# GitHub の OIDC トークンの sub は、既定で「変わらないID」を含む形式(immutable subject)になっている。
+#   repo:<owner>@<ownerのID>/<repo>@<repoのID>:<きっかけ>
+# 名前だけで判定すると、リポジトリを消した後に同じ名前で作り直された場合に、別人がこのロールを使えてしまう。
+# ID を含めることで、それを防ぐ。
+locals {
+  github_owner      = split("/", var.github_repository)[0]
+  github_repo       = split("/", var.github_repository)[1]
+  github_sub_prefix = "repo:${local.github_owner}@${var.github_owner_id}/${local.github_repo}@${var.github_repository_id}"
+}
+
 resource "aws_iam_openid_connect_provider" "github" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
@@ -26,8 +36,8 @@ data "aws_iam_policy_document" "github_plan_trust" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repository}:pull_request",
-        "repo:${var.github_repository}:ref:refs/heads/main",
+        "${local.github_sub_prefix}:pull_request",
+        "${local.github_sub_prefix}:ref:refs/heads/main",
       ]
     }
   }
