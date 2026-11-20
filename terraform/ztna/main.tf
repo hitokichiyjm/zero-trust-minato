@@ -35,19 +35,32 @@ locals {
 # 1. Cloudflare Tunnel(環境ごとに1つ)
 # =====================================================================
 
+# トンネルの秘密(32バイト)は Terraform が作る。
+# Cloudflare から「トークンを取得」すると編集の権限が必要になり、CI(読み取り専用)の plan ができない。
+# 秘密を自分で持てば、トークン(アカウントID・トンネルID・秘密の組)を自分で組み立てられる。
+resource "random_bytes" "tunnel_secret" {
+  for_each = local.envs
+  length   = 32
+}
+
 resource "cloudflare_zero_trust_tunnel_cloudflared" "this" {
   for_each = local.envs
 
-  account_id = var.cloudflare_account_id
-  name       = "${var.project}-${each.key}"
-  config_src = "cloudflare" # 転送の設定は Cloudflare 側(このコード)で持つ
+  account_id    = var.cloudflare_account_id
+  name          = "${var.project}-${each.key}"
+  config_src    = "cloudflare" # 転送の設定は Cloudflare 側(このコード)で持つ
+  tunnel_secret = random_bytes.tunnel_secret[each.key].base64
 }
 
-data "cloudflare_zero_trust_tunnel_cloudflared_token" "this" {
-  for_each = local.envs
-
-  account_id = var.cloudflare_account_id
-  tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.this[each.key].id
+locals {
+  # cloudflared のトークンの形式:{"a": アカウントID, "t": トンネルID, "s": 秘密} を Base64 にしたもの
+  tunnel_tokens = {
+    for env, t in cloudflare_zero_trust_tunnel_cloudflared.this : env => base64encode(jsonencode({
+      a = var.cloudflare_account_id
+      t = t.id
+      s = random_bytes.tunnel_secret[env].base64
+    }))
+  }
 }
 
 # ホスト名ごとに、サーバーの中のどのポートへ渡すか
@@ -130,7 +143,7 @@ module "host_prod" {
   env          = "prod"
   vpc_cidr     = local.envs.prod.vpc_cidr
   apps         = { for k, v in local.envs.prod.apps : k => { port = v.port, title = v.title } }
-  tunnel_token = data.cloudflare_zero_trust_tunnel_cloudflared_token.this["prod"].token
+  tunnel_token = local.tunnel_tokens["prod"]
 }
 
 module "host_dev" {
@@ -140,7 +153,7 @@ module "host_dev" {
   env          = "dev"
   vpc_cidr     = local.envs.dev.vpc_cidr
   apps         = { for k, v in local.envs.dev.apps : k => { port = v.port, title = v.title } }
-  tunnel_token = data.cloudflare_zero_trust_tunnel_cloudflared_token.this["dev"].token
+  tunnel_token = local.tunnel_tokens["dev"]
 }
 
 output "app_urls" {

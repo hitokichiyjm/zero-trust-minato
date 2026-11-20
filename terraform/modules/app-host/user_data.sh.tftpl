@@ -36,15 +36,19 @@ UNIT
 curl -fsSL https://pkg.cloudflare.com/cloudflared-ascii.repo -o /etc/yum.repos.d/cloudflared.repo
 for i in 1 2 3 4 5; do dnf install -y cloudflared && break || sleep 15; done
 
-# トンネルのトークンを SSM から読み、root だけが読めるファイルに置く(コマンドラインには出さない)
-install -d -m 700 /etc/cloudflared
-for i in $(seq 1 20); do
-  TOKEN=$(aws ssm get-parameter --name '${param_name}' --with-decryption --query Parameter.Value --output text) && break
-  sleep 15
-done
-umask 077
-printf 'TUNNEL_TOKEN=%s\n' "$TOKEN" > /etc/cloudflared/token.env
-unset TOKEN
+# cloudflared を起動するたびに、トンネルのトークンを SSM から読む(トークンを替えたら、再起動だけで反映される)
+# トークンはファイルにもコマンドラインにも残さず、環境変数で cloudflared に渡す
+cat > /usr/local/bin/run-cloudflared <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+export AWS_USE_DUALSTACK_ENDPOINT=true
+export AWS_DEFAULT_REGION=${region}
+TUNNEL_TOKEN=$(aws ssm get-parameter --name '${param_name}' --with-decryption --query Parameter.Value --output text)
+export TUNNEL_TOKEN
+# IPv4 のインターネットへの経路がないため、Cloudflare には IPv6 でつなぐ
+exec /usr/bin/cloudflared tunnel --no-autoupdate --edge-ip-version 6 run
+SCRIPT
+chmod 700 /usr/local/bin/run-cloudflared
 
 cat > /etc/systemd/system/cloudflared.service <<'UNIT'
 [Unit]
@@ -53,11 +57,9 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-EnvironmentFile=/etc/cloudflared/token.env
-# IPv4 のインターネットへの経路がないため、Cloudflare には IPv6 でつなぐ
-ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --edge-ip-version 6 run
+ExecStart=/usr/local/bin/run-cloudflared
 Restart=always
-RestartSec=5
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
