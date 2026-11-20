@@ -117,6 +117,8 @@ jobs:
               echo "::add-mask::${b}"
             done
           done
+          # 組織の ID(o-xxxx)も隠す(ログ用 S3 のパスや ARN に出る)
+          echo "::add-mask::$(aws organizations describe-organization --query Organization.Id --output text)"
           # Identity Center の ID ストアの ID(d-xxxx)は、アクセスポータルの URL と同じ文字列のため隠す
           for id in $(aws sso-admin list-instances --query 'Instances[].IdentityStoreId' --output text); do
             echo "::add-mask::${id}"
