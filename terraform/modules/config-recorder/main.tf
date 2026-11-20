@@ -28,6 +28,7 @@ resource "aws_iam_service_linked_role" "config" {
 }
 
 resource "aws_config_configuration_recorder" "this" {
+  #checkov:skip=CKV2_AWS_48:費用を抑えるため、記録するリソースを検知と自動対応に必要な種類に絞っている(DOC-03 7章、V-2)
   name     = "default"
   role_arn = aws_iam_service_linked_role.config.arn
 
@@ -50,6 +51,7 @@ resource "aws_config_delivery_channel" "this" {
 }
 
 resource "aws_config_configuration_recorder_status" "this" {
+  #checkov:skip=CKV2_AWS_45:費用を抑えるため、記録するリソースを検知と自動対応に必要な種類に絞っている(DOC-03 7章、V-2)
   name       = aws_config_configuration_recorder.this.name
   is_enabled = true
 
