@@ -38,3 +38,6 @@ __pycache__/
 # ---- 個人用のメモ(公開しない) ----
 引き継ぎ_*.md
 _private/
+
+# ---- Lambda のビルド成果物(Terraform が作る zip) ----
+**/.build/

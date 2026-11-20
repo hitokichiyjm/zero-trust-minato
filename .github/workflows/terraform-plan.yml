@@ -48,6 +48,7 @@ jobs:
           - terraform/baseline
           - terraform/logging
           - terraform/detection
+          - terraform/response
     defaults:
       run:
         working-directory: ${{ matrix.dir }}
@@ -118,6 +119,10 @@ jobs:
                        aws s3api list-buckets --query 'Buckets[].Name' --output text); do
               echo "::add-mask::${b}"
             done
+          done
+          # 各アカウントのルートユーザーのメールアドレスも隠す(GuardDuty のメンバーの設定に出る)
+          for e in $(aws organizations list-accounts --query 'Accounts[].Email' --output text); do
+            echo "::add-mask::${e}"
           done
           # 組織の ID(o-xxxx)も隠す(ログ用 S3 のパスや ARN に出る)
           echo "::add-mask::$(aws organizations describe-organization --query Organization.Id --output text)"
