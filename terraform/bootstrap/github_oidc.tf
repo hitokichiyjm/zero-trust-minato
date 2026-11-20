@@ -63,6 +63,13 @@ data "aws_iam_policy_document" "github_plan_lock" {
     actions   = ["s3:PutObject", "s3:DeleteObject"]
     resources = ["${aws_s3_bucket.tfstate.arn}/*.tflock"]
   }
+
+  # メンバーアカウントの読み取り専用ロール(baseline スタックで作る)を引き受けて plan する
+  statement {
+    sid       = "AssumeMemberPlanReadOnly"
+    actions   = ["sts:AssumeRole"]
+    resources = ["arn:aws:iam::*:role/${var.project}-plan-readonly"]
+  }
 }
 
 resource "aws_iam_role_policy" "github_plan_lock" {
