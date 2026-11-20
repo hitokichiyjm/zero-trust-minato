@@ -44,6 +44,7 @@ jobs:
         dir:
           - terraform/bootstrap
           - terraform/org
+          - terraform/identity
     defaults:
       run:
         working-directory: ${{ matrix.dir }}
@@ -56,6 +57,7 @@ jobs:
       TF_VAR_management_account_id: ${{ secrets.MANAGEMENT_ACCOUNT_ID }}
       TF_VAR_notification_email: ${{ secrets.NOTIFICATION_EMAIL }}
       TF_VAR_account_emails: ${{ secrets.ACCOUNT_EMAILS }}
+      TF_VAR_admin_user_name: ${{ secrets.ADMIN_USER_NAME }}
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,6 +95,10 @@ jobs:
         if: steps.backend.outputs.exists == 'true'
         run: |
           for id in $(aws organizations list-accounts --query 'Accounts[].Id' --output text); do
+            echo "::add-mask::${id}"
+          done
+          # Identity Center の ID ストアの ID(d-xxxx)は、アクセスポータルの URL と同じ文字列のため隠す
+          for id in $(aws sso-admin list-instances --query 'Instances[].IdentityStoreId' --output text); do
             echo "::add-mask::${id}"
           done
 
