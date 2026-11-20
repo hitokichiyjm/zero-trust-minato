@@ -11,6 +11,9 @@ locals {
   management_id = data.aws_caller_identity.management.account_id
   log_id        = one([for a in data.aws_organizations_organization.this.accounts : a.id if a.name == "${var.project}-log-archive"])
 
+  # 組織の全アカウント(Config の書き込みを許す相手)
+  org_account_ids = sort([for a in data.aws_organizations_organization.this.accounts : a.id if a.status == "ACTIVE"])
+
   trail_name = "${var.project}-org-trail"
   trail_arn  = "arn:${data.aws_partition.current.partition}:cloudtrail:${var.aws_region}:${local.management_id}:trail/${local.trail_name}"
 }
@@ -121,7 +124,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   depends_on = [aws_s3_bucket_versioning.logs]
 }
 
-# 書き込めるのは CloudTrail(この組織の証跡だけ)と Config(この組織だけ)。暗号化されていない通信は拒否する
+# 書き込めるのは CloudTrail(この組織の証跡だけ)。暗号化されていない通信は拒否する
+# Config は、オブジェクトロックのあるバケットに書き込めないため、別のバケットに送る(config.tf)
 data "aws_iam_policy_document" "logs" {
   statement {
     sid       = "CloudTrailAclCheck"
@@ -157,40 +161,6 @@ data "aws_iam_policy_document" "logs" {
       test     = "StringEquals"
       variable = "aws:SourceArn"
       values   = [local.trail_arn]
-    }
-  }
-
-  statement {
-    sid       = "ConfigAclCheck"
-    actions   = ["s3:GetBucketAcl", "s3:ListBucket"]
-    resources = [aws_s3_bucket.logs.arn]
-
-    principals {
-      type        = "Service"
-      identifiers = ["config.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceOrgID"
-      values   = [local.org_id]
-    }
-  }
-
-  statement {
-    sid       = "ConfigWrite"
-    actions   = ["s3:PutObject"]
-    resources = ["${aws_s3_bucket.logs.arn}/AWSLogs/*/Config/*"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["config.amazonaws.com"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:SourceOrgID"
-      values   = [local.org_id]
     }
   }
 
