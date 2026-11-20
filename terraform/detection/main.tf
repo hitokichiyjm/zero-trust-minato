@@ -258,6 +258,7 @@ resource "aws_config_configuration_aggregator" "org" {
 
 # 管理アカウントをメンバーにするには、先に管理アカウント自身で GuardDuty を有効にする必要がある(AWS の仕様)
 resource "aws_guardduty_detector" "management" {
+  #checkov:skip=CKV2_AWS_3:この検知器は aws_guardduty_member で security(委任管理者)の組織のメンバーにしている。Checkov はそのつながりを追えない
   enable = true
 }
 
