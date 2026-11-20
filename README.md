@@ -25,17 +25,36 @@
 | フェーズ | 内容 | 状態 |
 |---|---|---|
 | P0 準備 | 費用アラート、秘密情報の検査、Terraform の土台(状態ファイル、GitHub OIDC) | 完了([作業記録](ops-log/2026-11_P0.md)) |
-| P1 最小構成 | マルチアカウント、SSO + MFA、検知、通知と自動対応 | 未着手 |
+| P1 最小構成 | マルチアカウント、SSO + MFA、検知、通知と自動対応 | 完了([作業記録と受け入れ基準の確認](ops-log/2026-11_P1.md)) |
 | P2 完成形 | ZTNA、ログ集約、ダッシュボードとエスカレーション | 未着手 |
 | P3 追加 | RISKEN、ハイブリッド接続 | 未着手 |
 
+## できていること(P1 まで)
+| 項目 | 内容 |
+|---|---|
+| アカウント | AWS Organizations で5つ(管理、security、log-archive、prod、dev)。SCP で、東京以外のリージョン・IAM ユーザーの作成・検知とログの停止を禁止 |
+| ID | IAM Identity Center(MFA は FIDO2 のみ)。役割ごとに6グループ・4許可セット。**IAM ユーザーは0** |
+| 検知 | GuardDuty・Security Hub CSPM(FSBP)・Config・IAM Access Analyzer を全アカウントで有効化し、security に集約 |
+| 自動対応 | 危険なポートの全開放を **12秒で自動的に閉じる**。検知を止める操作の試み、重大度 HIGH 以上の検知を通知 |
+| ログ | 組織の CloudTrail を、オブジェクトロック(1年)の S3 に保管 |
+| 開発の流れ | 変更は PR だけ。7つのスタックの plan と Checkov が通らないとマージできない。公開ログでアカウントIDなどを隠す |
+
 ## ディレクトリ
 ```
-docs/                 設計書
+docs/                 設計書(要件定義、脅威分析、方式設計、運用手順)
 docs/build/           フェーズごとの構築手順
 terraform/bootstrap/  状態ファイル用 S3、GitHub OIDC、費用アラート
+terraform/org/        Organizations、OU、アカウント、SCP
+terraform/identity/   IAM Identity Center のグループ、許可セット、割り当て
+terraform/baseline/   全アカウントの予防的な基本設定、CI 用の読み取り専用ロール
+terraform/logging/    組織の CloudTrail、ログ用 S3
+terraform/detection/  GuardDuty、Security Hub CSPM、Config、Access Analyzer
+terraform/response/   イベントの集約、通知と自動修復
+terraform/modules/    共通のモジュール
+lambda/response/      通知と自動修復の Lambda(Python)
+scripts/              取り込み(import)などの補助スクリプト
 .github/workflows/    terraform plan と Checkov(plan のみ。apply は手元から)
-ops-log/              作業記録(つまずいたことと対応を含む)
+ops-log/              作業記録(つまずいたこと・インシデントと対応、受け入れ基準の確認)
 ```
 
 ## 秘密情報の扱い
