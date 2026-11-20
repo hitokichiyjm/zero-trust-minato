@@ -121,6 +121,7 @@ data "aws_iam_policy_document" "protect_logs" {
     sid    = "DenyTamperingLogBuckets"
     effect = "Deny"
     actions = [
+      "s3:BypassGovernanceRetention",
       "s3:DeleteBucket",
       "s3:DeleteBucketPolicy",
       "s3:PutBucketObjectLockConfiguration",

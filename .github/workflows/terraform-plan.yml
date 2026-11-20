@@ -45,6 +45,8 @@ jobs:
           - terraform/bootstrap
           - terraform/org
           - terraform/identity
+          - terraform/baseline
+          - terraform/logging
     defaults:
       run:
         working-directory: ${{ matrix.dir }}
@@ -59,6 +61,8 @@ jobs:
       TF_VAR_account_emails: ${{ secrets.ACCOUNT_EMAILS }}
       TF_VAR_admin_user_name: ${{ secrets.ADMIN_USER_NAME }}
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      # メンバーアカウントでは、読み取り専用のロールを引き受ける(baseline スタックで作ったもの)
+      TF_VAR_member_role_name: zero-trust-minato-plan-readonly
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -97,6 +101,24 @@ jobs:
           for id in $(aws organizations list-accounts --query 'Accounts[].Id' --output text); do
             echo "::add-mask::${id}"
           done
+          # 全アカウントの S3 バケット名も隠す(状態ファイルやログ用のバケット名を公開しないため)
+          for b in $(aws s3api list-buckets --query 'Buckets[].Name' --output text); do
+            echo "::add-mask::${b}"
+          done
+          mgmt=$(aws sts get-caller-identity --query Account --output text)
+          for id in $(aws organizations list-accounts --query 'Accounts[].Id' --output text); do
+            [ "${id}" = "${mgmt}" ] && continue
+            creds=$(aws sts assume-role --role-arn "arn:aws:iam::${id}:role/zero-trust-minato-plan-readonly" \
+              --role-session-name mask-buckets --query Credentials --output json 2>/dev/null) || continue
+            for b in $(AWS_ACCESS_KEY_ID=$(echo "${creds}" | jq -r .AccessKeyId) \
+                       AWS_SECRET_ACCESS_KEY=$(echo "${creds}" | jq -r .SecretAccessKey) \
+                       AWS_SESSION_TOKEN=$(echo "${creds}" | jq -r .SessionToken) \
+                       aws s3api list-buckets --query 'Buckets[].Name' --output text); do
+              echo "::add-mask::${b}"
+            done
+          done
+          # 組織の ID(o-xxxx)も隠す(ログ用 S3 のパスや ARN に出る)
+          echo "::add-mask::$(aws organizations describe-organization --query Organization.Id --output text)"
           # Identity Center の ID ストアの ID(d-xxxx)は、アクセスポータルの URL と同じ文字列のため隠す
           for id in $(aws sso-admin list-instances --query 'Instances[].IdentityStoreId' --output text); do
             echo "::add-mask::${id}"
