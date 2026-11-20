@@ -84,7 +84,10 @@ resource "aws_guardduty_organization_configuration_feature" "optional" {
   name        = each.key
   auto_enable = "NONE"
 
-  depends_on = [aws_guardduty_organization_configuration.this]
+  depends_on = [
+    aws_guardduty_organization_configuration.this,
+    aws_guardduty_detector.management,
+  ]
 }
 
 resource "aws_guardduty_detector_feature" "optional" {
@@ -250,5 +253,44 @@ resource "aws_config_configuration_aggregator" "org" {
   depends_on = [
     aws_organizations_delegated_administrator.this,
     aws_iam_role_policy_attachment.config_aggregator,
+  ]
+}
+
+# 管理アカウントをメンバーにするには、先に管理アカウント自身で GuardDuty を有効にする必要がある(AWS の仕様)
+resource "aws_guardduty_detector" "management" {
+  enable = true
+}
+
+resource "aws_guardduty_detector_feature" "management_optional" {
+  for_each = toset(var.guardduty_optional_features)
+
+  detector_id = aws_guardduty_detector.management.id
+  name        = each.key
+  status      = "DISABLED"
+}
+
+# 既にあるアカウントは、auto_enable_organization_members = "ALL" だけでは
+# メンバーにならなかった(検知器が作られなかった)。そのため、明示的にメンバーとして追加する。
+# メールアドレスは Organizations の情報から取る(GuardDuty の API で必須のため)。
+resource "aws_guardduty_member" "existing" {
+  for_each = {
+    for a in data.aws_organizations_organization.this.accounts : a.id => a.email
+    if a.status == "ACTIVE" && a.id != local.account_ids.security
+  }
+
+  provider    = aws.security
+  detector_id = aws_guardduty_detector.security.id
+  account_id  = each.key
+  email       = each.value
+  invite      = false # 組織のアカウントなので招待は不要
+
+  lifecycle {
+    # email と invite は作成時だけの値で、作成後は読み取れない(違う値が返る)ため、差分を無視する
+    ignore_changes = [email, invite]
+  }
+
+  depends_on = [
+    aws_guardduty_organization_configuration.this,
+    aws_guardduty_detector.management,
   ]
 }
