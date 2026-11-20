@@ -1,0 +1,12 @@
+# このファイルを terraform.tfvars にコピーして値を入れる(terraform.tfvars は Git に入らない)
+management_account_id = "123456789012"
+
+account_emails = {
+  security = "you+aws-security@example.com"
+  log      = "you+aws-log@example.com"
+  prod     = "you+aws-prod@example.com"
+  dev      = "you+aws-dev@example.com"
+}
+
+# 組織が既に信頼しているサービスで、organization.tf の一覧にないものがあれば足す
+# extra_service_access_principals = ["example.amazonaws.com"]
