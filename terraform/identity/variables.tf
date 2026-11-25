@@ -24,3 +24,14 @@ variable "admin_user_name" {
   description = "情報システム担当(g-it-admin)に入れる、Identity Center のユーザー名。P0 で手動で作ったもの"
   type        = string
 }
+
+variable "test_email_base" {
+  description = "検証用の利用者のメールの元になる Gmail のアドレス。「+sales」などを付けて使う(公開しない)"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^[^@+]+@[^@]+$", var.test_email_base))
+    error_message = "「+」を含まないメールアドレスで指定してください。"
+  }
+}

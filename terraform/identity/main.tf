@@ -176,3 +176,59 @@ resource "aws_ssoadmin_account_assignment" "this" {
     aws_ssoadmin_permission_set_inline_policy.dashboard_viewer,
   ]
 }
+
+# ---- 検証用の利用者(P2-2b、受け入れ基準 AC-1 の確認に使う) ----
+# メールは Gmail の「+」の別名(例:name+sales@gmail.com)。元のアドレスは公開しないので変数から渡す。
+# パスワードとパスキー(FIDO2)の登録は、利用者本人(=自分)が画面で行う。
+locals {
+  test_email_parts = split("@", var.test_email_base)
+
+  test_users = {
+    "t-sales" = {
+      given  = "営業"
+      family = "検証"
+      group  = "g-sales"
+      tag    = "sales"
+    }
+    # AC-1(AWS):検証(dev)は Developer、本番(prod)は読み取りだけ、ほかのアカウントには入れないことを示す
+    "t-developer" = {
+      given  = "開発"
+      family = "検証"
+      group  = "g-developer"
+      tag    = "developer"
+    }
+    "t-contractor" = {
+      given  = "委託"
+      family = "検証"
+      group  = "g-contractor"
+      tag    = "contractor"
+    }
+  }
+}
+
+resource "aws_identitystore_user" "test" {
+  for_each = local.test_users
+
+  identity_store_id = local.identity_store_id
+  user_name         = each.key
+  display_name      = "${each.value.family} ${each.value.given}"
+
+  name {
+    given_name  = each.value.given
+    family_name = each.value.family
+  }
+
+  emails {
+    value   = "${local.test_email_parts[0]}+${each.value.tag}@${local.test_email_parts[1]}"
+    primary = true
+    type    = "work"
+  }
+}
+
+resource "aws_identitystore_group_membership" "test" {
+  for_each = local.test_users
+
+  identity_store_id = local.identity_store_id
+  group_id          = aws_identitystore_group.this[each.value.group].group_id
+  member_id         = aws_identitystore_user.test[each.key].user_id
+}

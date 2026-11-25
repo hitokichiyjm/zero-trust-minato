@@ -68,7 +68,11 @@ jobs:
       # Cloudflare(CI は読み取り専用のトークン)
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_READ }}
       TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      TF_VAR_admin_emails: ${{ secrets.ACCESS_ADMIN_EMAILS }}
+      TF_VAR_sso_application_arn: ${{ secrets.SSO_APPLICATION_ARN }}
+      TF_VAR_saml_sso_url: ${{ secrets.SAML_SSO_URL }}
+      TF_VAR_saml_issuer_url: ${{ secrets.SAML_ISSUER_URL }}
+      TF_VAR_saml_certificate: ${{ secrets.SAML_CERTIFICATE }}
+      TF_VAR_test_email_base: ${{ secrets.TEST_EMAIL_BASE }}
       # メンバーアカウントでは、読み取り専用のロールを引き受ける(baseline スタックで作ったもの)
       TF_VAR_member_role_name: zero-trust-minato-plan-readonly
     steps:
@@ -132,18 +136,47 @@ jobs:
           # 組織の ID(o-xxxx)も隠す(ログ用 S3 のパスや ARN に出る)
           echo "::add-mask::$(aws organizations describe-organization --query Organization.Id --output text)"
           # Cloudflare のゾーンの ID と、トンネルの ID も隠す(読み取り専用のトークンで調べる)
+          # どの取得も、先に変数に入れてからループする。取得に失敗したら -e で止まり、隠さないまま plan へ進まない
+          # (for の中のコマンド置換や、パイプの途中の失敗では -e が効かないため)
           if [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
             cf() { curl -fsS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "https://api.cloudflare.com/client/v4/$1"; }
-            for id in $(cf "zones?per_page=50" | jq -r '.result[].id'); do
+            zones=$(cf "zones?per_page=50")
+            zone_ids=$(echo "${zones}" | jq -r '.result[].id')
+            for id in ${zone_ids}; do
               echo "::add-mask::${id}"
             done
-            for id in $(cf "accounts/${TF_VAR_cloudflare_account_id}/cfd_tunnel?is_deleted=false" | jq -r '.result[].id'); do
+            tunnels=$(cf "accounts/${TF_VAR_cloudflare_account_id}/cfd_tunnel?is_deleted=false")
+            tunnel_ids=$(echo "${tunnels}" | jq -r '.result[].id')
+            for id in ${tunnel_ids}; do
               echo "::add-mask::${id}"
             done
+            # Access の IdP(SAML)の ID も隠す(ポリシーとアプリの設定に出る)
+            idps=$(cf "accounts/${TF_VAR_cloudflare_account_id}/access/identity_providers")
+            idp_ids=$(echo "${idps}" | jq -r '.result[].id')
+            for id in ${idp_ids}; do
+              echo "::add-mask::${id}"
+            done
+            # Zero Trust の組織のチームのドメインと名前も隠す(組織の plan に出る)
+            org=$(cf "accounts/${TF_VAR_cloudflare_account_id}/access/organizations")
+            org_domain=$(echo "${org}" | jq -er '.result.auth_domain')
+            org_name=$(echo "${org}" | jq -er '.result.name')
+            echo "::add-mask::${org_domain}"
+            echo "::add-mask::${org_name}"
           fi
           # Identity Center の ID ストアの ID(d-xxxx)は、アクセスポータルの URL と同じ文字列のため隠す
-          for id in $(aws sso-admin list-instances --query 'Instances[].IdentityStoreId' --output text); do
+          store_ids=$(aws sso-admin list-instances --query 'Instances[].IdentityStoreId' --output text)
+          for id in ${store_ids}; do
             echo "::add-mask::${id}"
+            # グループの ID も隠す(Access のポリシーの条件と、アプリへの割り当てに出る)
+            gids=$(aws identitystore list-groups --identity-store-id "${id}" --query 'Groups[].GroupId' --output text)
+            for gid in ${gids}; do
+              echo "::add-mask::${gid}"
+            done
+            # 利用者の ID も隠す(検証用の利用者と、グループへの所属に出る)
+            uids=$(aws identitystore list-users --identity-store-id "${id}" --query 'Users[].UserId' --output text)
+            for uid in ${uids}; do
+              echo "::add-mask::${uid}"
+            done
           done
 
       - name: terraform init
