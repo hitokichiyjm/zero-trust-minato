@@ -41,3 +41,6 @@ _private/
 
 # ---- Lambda のビルド成果物(Terraform が作る zip) ----
 **/.build/
+
+# ---- Claude Code の個人用の設定 ----
+.claude/settings.local.json
