@@ -163,6 +163,13 @@ jobs:
             echo "::add-mask::${org_domain}"
             echo "::add-mask::${org_name}"
           fi
+          # Identity Center のインスタンスの ARN と ID(ssoins-xxxx)も隠す
+          # (権限セットの ARN の中に出る。デュアルスタックのアクセスポータルの URL の一部でもある)
+          instance_arns=$(aws sso-admin list-instances --query 'Instances[].InstanceArn' --output text)
+          for arn in ${instance_arns}; do
+            echo "::add-mask::${arn}"
+            echo "::add-mask::${arn##*/}"
+          done
           # Identity Center の ID ストアの ID(d-xxxx)は、アクセスポータルの URL と同じ文字列のため隠す
           store_ids=$(aws sso-admin list-instances --query 'Instances[].IdentityStoreId' --output text)
           for id in ${store_ids}; do
