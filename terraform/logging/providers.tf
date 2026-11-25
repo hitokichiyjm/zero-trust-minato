@@ -29,3 +29,18 @@ provider "aws" {
     tags = local.default_tags
   }
 }
+
+# security アカウント(GuardDuty の委任管理者。検知のイベントを log-archive に転送する。P2-3)
+provider "aws" {
+  alias  = "security"
+  region = var.aws_region
+
+  assume_role {
+    role_arn     = "arn:aws:iam::${local.security_id}:role/${var.member_role_name}"
+    session_name = "terraform-logging"
+  }
+
+  default_tags {
+    tags = local.default_tags
+  }
+}

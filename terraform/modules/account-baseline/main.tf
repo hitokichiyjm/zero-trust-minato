@@ -70,3 +70,35 @@ resource "aws_iam_role_policy_attachment" "ci_plan" {
   role       = aws_iam_role.ci_plan[0].name
   policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
+
+# CI の plan 用ロールは ReadOnlyAccess で SSM の SecureString を復号して読めるため、
+# Terraform で管理しない秘密(Cloudflare のログ用トークンなど。/<project>/cloudflare/ の下)は読めないようにする(P2-3 のレビュー H-1)
+data "aws_iam_policy_document" "ci_plan_deny_secrets" {
+  statement {
+    sid    = "DenyUnmanagedSecrets"
+    effect = "Deny"
+    actions = [
+      "ssm:GetParameter",
+      "ssm:GetParameters",
+      "ssm:GetParameterHistory",
+    ]
+    resources = ["arn:aws:ssm:*:*:parameter/${var.project}/cloudflare/*"]
+  }
+
+  # パスでまとめて読む操作は、上の階層(/<project> など)を指定すると下の秘密まで返すため、すべて禁止する
+  # (Terraform の plan はこの操作を使わない)
+  statement {
+    sid       = "DenyReadByPath"
+    effect    = "Deny"
+    actions   = ["ssm:GetParametersByPath"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "ci_plan_deny_secrets" {
+  count = var.ci_plan_role_arn == "" ? 0 : 1
+
+  name   = "deny-unmanaged-secrets"
+  role   = aws_iam_role.ci_plan[0].id
+  policy = data.aws_iam_policy_document.ci_plan_deny_secrets.json
+}

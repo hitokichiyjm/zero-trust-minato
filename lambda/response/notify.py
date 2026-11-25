@@ -57,6 +57,21 @@ def _handle_findings(event):
         _mark_notified(f)
 
 
+def _handle_alarm(event):
+    """ログの収集用の Lambda の失敗(CloudWatch のアラーム。P2-3)"""
+    d = event["detail"]
+    state = d.get("state", {})
+    lines = [
+        f"アカウント:{event.get('account')}",
+        f"アラーム:{d.get('alarmName', '')}",
+        f"状態:{state.get('value', '')}",
+        f"理由:{state.get('reason', '')}",
+        f"時刻:{state.get('timestamp', event.get('time'))}",
+        "対応:log-archive の Lambda のログを見る(運用手順書 OP-20。トークンの期限切れなら OP-47)",
+    ]
+    notify_lib.send(f"ログの収集の失敗:{d.get('alarmName', '')}", lines, "HIGH")
+
+
 def _mark_notified(finding):
     """通知したことを Security Hub に記録する(ダッシュボードの「対応状況」にも使う)。
 
@@ -82,6 +97,8 @@ def handler(event, _context):
     logger.info("受け取ったイベント:%s / %s", event.get("source"), event.get("detail-type"))
     if event.get("detail-type") == "Security Hub Findings - Imported":
         _handle_findings(event)
+    elif event.get("detail-type") == "CloudWatch Alarm State Change":
+        _handle_alarm(event)
     else:
         _handle_api_call(event)
     return {"ok": True}
