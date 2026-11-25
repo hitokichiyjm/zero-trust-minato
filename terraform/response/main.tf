@@ -252,6 +252,16 @@ locals {
         detail        = { userIdentity = { type = ["Root"] } }
       }
     }
+    # P2-3:ログの収集用の Lambda(log-archive)の失敗のアラーム(集約用バス。logging スタックが転送する)→ 通知
+    collector-alarm = {
+      bus      = aws_cloudwatch_event_bus.security.name
+      function = "notify"
+      pattern = {
+        source        = ["aws.cloudwatch"]
+        "detail-type" = ["CloudWatch Alarm State Change"]
+        detail        = { state = { value = ["ALARM"] } }
+      }
+    }
     # AR-3:Security Hub の重大度 HIGH 以上で、まだ通知していないもの(security の既定のバス)→ 通知
     high-findings = {
       bus      = "default"

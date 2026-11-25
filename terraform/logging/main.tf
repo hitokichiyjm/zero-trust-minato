@@ -10,6 +10,7 @@ locals {
   org_id        = data.aws_organizations_organization.this.id
   management_id = data.aws_caller_identity.management.account_id
   log_id        = one([for a in data.aws_organizations_organization.this.accounts : a.id if a.name == "${var.project}-log-archive"])
+  security_id   = one([for a in data.aws_organizations_organization.this.accounts : a.id if a.name == "${var.project}-security"])
 
   # 組織の全アカウント(Config の書き込みを許す相手)
   org_account_ids = sort([for a in data.aws_organizations_organization.this.accounts : a.id if a.status == "ACTIVE"])
