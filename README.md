@@ -37,7 +37,7 @@
 | 検知 | GuardDuty・Security Hub CSPM(FSBP)・Config・IAM Access Analyzer を全アカウントで有効化し、security に集約 |
 | 自動対応 | 危険なポートの全開放を **12秒で自動的に閉じる**。検知を止める操作の試み、重大度 HIGH 以上の検知を通知 |
 | ログ | 組織の CloudTrail を、オブジェクトロック(1年)の S3 に保管 |
-| 開発の流れ | 変更は PR だけ。7つのスタックの plan と Checkov が通らないとマージできない。公開ログでアカウントIDなどを隠す |
+| 開発の流れ | 変更は PR だけ。9つのスタックの plan と Checkov が通らないとマージできない。公開ログでアカウントIDなどを隠す |
 
 ## ディレクトリ
 ```
@@ -49,7 +49,9 @@ terraform/identity/   IAM Identity Center のグループ、許可セット、�
 terraform/baseline/   全アカウントの予防的な基本設定、CI 用の読み取り専用ロール
 terraform/logging/    組織の CloudTrail、ログ用 S3
 terraform/detection/  GuardDuty、Security Hub CSPM、Config、Access Analyzer
-terraform/response/   イベントの集約、通知と自動修復
+terraform/response/   イベントの集約、通知と自動修復、エスカレーション
+terraform/ztna/       ZTNA(IPv6 だけのサーバー、Cloudflare Tunnel、Access のアプリとポリシー)
+terraform/dashboard/  ダッシュボード3枚、指標の集計の Lambda とアラーム
 terraform/modules/    共通のモジュール
 lambda/response/      通知と自動修復の Lambda(Python)
 scripts/              取り込み(import)などの補助スクリプト

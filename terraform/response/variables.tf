@@ -49,3 +49,25 @@ variable "log_retention_days" {
   type        = number
   default     = 30
 }
+
+variable "test_email_base" {
+  description = "検証用の利用者と同じ Gmail のアドレス。「+ceo」を付けて、代表役のエスカレーションの宛先にする(公開しない。CI は Secret の TEST_EMAIL_BASE)"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^[^@+]+@[^@]+$", var.test_email_base))
+    error_message = "「+」を含まないメールアドレスで指定してください。"
+  }
+}
+
+variable "escalation_start" {
+  description = "エスカレーションを始めた日(日本時間、YYYY-MM-DD)。これより前に見つかった検知は送らず、⑧ にも数えない(DOC-03 8.4)"
+  type        = string
+  default     = "2026-11-26"
+
+  validation {
+    condition     = can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", var.escalation_start))
+    error_message = "YYYY-MM-DD の形で指定してください。"
+  }
+}

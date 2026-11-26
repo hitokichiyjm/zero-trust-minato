@@ -50,6 +50,7 @@ jobs:
           - terraform/detection
           - terraform/response
           - terraform/ztna
+          - terraform/dashboard
     defaults:
       run:
         working-directory: ${{ matrix.dir }}

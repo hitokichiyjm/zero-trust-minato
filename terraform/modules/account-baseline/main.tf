@@ -21,6 +21,12 @@ variable "ci_plan_role_arn" {
   default     = ""
 }
 
+variable "metrics_principal_arn" {
+  description = "ダッシュボードの指標③(長期のアクセスキー)のために、認証情報レポートを読んでよい security の集計用 Lambda のロールの ARN。空なら作らない(P2-4)"
+  type        = string
+  default     = ""
+}
+
 # EC2 のインスタンスメタデータは IMDSv2(トークン必須)だけにする(TH-12:SSRF で認証情報を盗まれる対策)
 resource "aws_ec2_instance_metadata_defaults" "this" {
   http_tokens                 = "required"
@@ -101,4 +107,51 @@ resource "aws_iam_role_policy" "ci_plan_deny_secrets" {
   name   = "deny-unmanaged-secrets"
   role   = aws_iam_role.ci_plan[0].id
   policy = data.aws_iam_policy_document.ci_plan_deny_secrets.json
+}
+
+# ---- ダッシュボードの指標③:IAM の認証情報レポートだけを読むロール(P2-4、DOC-03 10章) ----
+# 信頼は security のアカウントにし、条件で集計用 Lambda のロールに絞る
+# (ロールを ARN で直接書くと、そのロールが先にないと作れないため。apply の順番に縛られない)
+data "aws_iam_policy_document" "metrics_reader_trust" {
+  count = var.metrics_principal_arn == "" ? 0 : 1
+
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${split(":", var.metrics_principal_arn)[4]}:root"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:PrincipalArn"
+      values   = [var.metrics_principal_arn]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "metrics_reader" {
+  statement {
+    sid       = "ReadCredentialReport"
+    actions   = ["iam:GenerateCredentialReport", "iam:GetCredentialReport"]
+    resources = ["*"] # この2つは、リソースを指定できない操作
+  }
+}
+
+resource "aws_iam_role" "metrics_reader" {
+  count = var.metrics_principal_arn == "" ? 0 : 1
+
+  name                 = "${var.project}-metrics-reader"
+  description          = "Read the IAM credential report for the dashboard (P2-4)"
+  assume_role_policy   = data.aws_iam_policy_document.metrics_reader_trust[0].json
+  max_session_duration = 3600
+}
+
+resource "aws_iam_role_policy" "metrics_reader" {
+  count = var.metrics_principal_arn == "" ? 0 : 1
+
+  name   = "credential-report"
+  role   = aws_iam_role.metrics_reader[0].id
+  policy = data.aws_iam_policy_document.metrics_reader.json
 }

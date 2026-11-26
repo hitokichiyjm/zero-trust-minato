@@ -58,7 +58,7 @@ def _handle_findings(event):
 
 
 def _handle_alarm(event):
-    """ログの収集用の Lambda の失敗(CloudWatch のアラーム。P2-3)"""
+    """Lambda の失敗・停止のアラーム(CloudWatch のアラーム。P2-3・P2-4)"""
     d = event["detail"]
     state = d.get("state", {})
     lines = [
@@ -67,9 +67,22 @@ def _handle_alarm(event):
         f"状態:{state.get('value', '')}",
         f"理由:{state.get('reason', '')}",
         f"時刻:{state.get('timestamp', event.get('time'))}",
-        "対応:log-archive の Lambda のログを見る(運用手順書 OP-20。トークンの期限切れなら OP-47)",
+        "対応:アラームの名前の Lambda のログを見る(運用手順書 OP-20。Cloudflare のトークンの期限切れなら OP-47)",
     ]
-    notify_lib.send(f"ログの収集の失敗:{d.get('alarmName', '')}", lines, "HIGH")
+    notify_lib.send(f"Lambda の失敗・停止:{d.get('alarmName', '')}", lines, "HIGH")
+
+
+def _handle_contractor_expired(event):
+    """外部委託者を期限切れでグループから外した(P2-4、FR-ID-06)"""
+    d = event["detail"]
+    names = ", ".join(r.get("user_name", "") for r in d.get("removed", []))
+    lines = [
+        f"グループ:{d.get('group', '')}",
+        f"外した利用者:{names}",
+        f"日付:{d.get('date', '')}",
+        "対応:運用手順書 OP-12 の「終了」(Cloudflare のセッションの取り消しは OP-11 の手順2。コードの期限の行も片づける)",
+    ]
+    notify_lib.send("外部委託者の期限切れ:グループから外しました", lines, "ACTION")
 
 
 def _mark_notified(finding):
@@ -99,6 +112,8 @@ def handler(event, _context):
         _handle_findings(event)
     elif event.get("detail-type") == "CloudWatch Alarm State Change":
         _handle_alarm(event)
+    elif event.get("detail-type") == "Contractor Access Expired":
+        _handle_contractor_expired(event)
     else:
         _handle_api_call(event)
     return {"ok": True}

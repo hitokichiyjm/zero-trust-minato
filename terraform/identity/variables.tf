@@ -35,3 +35,9 @@ variable "test_email_base" {
     error_message = "「+」を含まないメールアドレスで指定してください。"
   }
 }
+
+variable "lambda_log_retention_days" {
+  description = "Lambda の動作ログ(CloudWatch Logs)の保持期間(日)"
+  type        = number
+  default     = 30
+}

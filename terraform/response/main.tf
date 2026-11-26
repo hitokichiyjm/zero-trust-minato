@@ -113,6 +113,11 @@ locals {
       handler     = "remediate_sg.handler"
       description = "Revoke security group rules open to the internet on risky ports (AR-1)"
     }
+    # P2-4:期限を過ぎたアラートを代表にエスカレーションする(FR-DB-03)
+    escalate = {
+      handler     = "escalate.handler"
+      description = "Escalate overdue alerts to the representative (P2-4, FR-DB-03)"
+    }
   }
 }
 
@@ -174,7 +179,11 @@ resource "aws_iam_role_policy" "lambda" {
   provider = aws.security
   name     = "permissions"
   role     = aws_iam_role.lambda[each.key].id
-  policy   = each.key == "notify" ? data.aws_iam_policy_document.lambda_notify.json : data.aws_iam_policy_document.lambda_remediate.json
+  policy = {
+    notify       = data.aws_iam_policy_document.lambda_notify.json
+    remediate-sg = data.aws_iam_policy_document.lambda_remediate.json
+    escalate     = data.aws_iam_policy_document.lambda_escalate.json
+  }[each.key]
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -204,16 +213,23 @@ resource "aws_lambda_function" "this" {
   handler          = each.value.handler
   filename         = data.archive_file.response.output_path
   source_code_hash = data.archive_file.response.output_base64sha256
-  timeout          = 30
+  timeout          = each.key == "escalate" ? 120 : 30
   memory_size      = 128
 
   environment {
-    variables = {
-      SNS_TOPIC_ARN         = aws_sns_topic.alerts.arn
-      SLACK_WEBHOOK_PARAM   = var.slack_webhook_param
-      REMEDIATION_ROLE_NAME = "${var.project}-remediation"
-      RISKY_PORTS           = join(",", var.risky_ports)
-    }
+    variables = merge(
+      {
+        SNS_TOPIC_ARN         = aws_sns_topic.alerts.arn
+        SLACK_WEBHOOK_PARAM   = var.slack_webhook_param
+        REMEDIATION_ROLE_NAME = "${var.project}-remediation"
+        RISKY_PORTS           = join(",", var.risky_ports)
+      },
+      each.key == "escalate" ? {
+        ESCALATION_TOPIC_ARN = aws_sns_topic.escalation.arn
+        METRIC_NAMESPACE     = local.metric_namespace
+        ESCALATION_START     = var.escalation_start
+      } : {},
+    )
   }
 
   depends_on = [aws_cloudwatch_log_group.lambda, aws_iam_role_policy.lambda]
@@ -250,6 +266,15 @@ locals {
       pattern = {
         "detail-type" = ["AWS Console Sign In via CloudTrail"]
         detail        = { userIdentity = { type = ["Root"] } }
+      }
+    }
+    # P2-4:外部委託者を期限切れでグループから外した(集約用バス。identity スタックの Lambda が送る)→ 通知
+    contractor-expired = {
+      bus      = aws_cloudwatch_event_bus.security.name
+      function = "notify"
+      pattern = {
+        source        = ["${var.project}.identity"]
+        "detail-type" = ["Contractor Access Expired"]
       }
     }
     # P2-3:ログの収集用の Lambda(log-archive)の失敗のアラーム(集約用バス。logging スタックが転送する)→ 通知

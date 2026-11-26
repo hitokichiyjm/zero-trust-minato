@@ -1,3 +1,4 @@
 # このファイルを terraform.tfvars にコピーして値を入れる(terraform.tfvars は Git に入らない)
 management_account_id = "123456789012"
 notification_email    = "you@example.com"
+test_email_base       = "you@gmail.com"
