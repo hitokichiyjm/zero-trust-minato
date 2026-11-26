@@ -23,7 +23,7 @@ resource "random_id" "athena_suffix" {
 resource "aws_s3_bucket" "athena_results" {
   provider = aws.log
   # 下の skip は、手元の Checkov(3.4.5)では対象にならなかった(暗号化などを別のリソースで設定しているため)。
-  # CI の Checkov の版で出る場合に備えて、理由とともに残す(P2-3 のレビュー L-3)
+  # CI の Checkov の版で出る場合に備えて、理由とともに残す(P2-3)
   #checkov:skip=CKV_AWS_144:別リージョンへの複製は行わない。検索結果は一時的なもの
   #checkov:skip=CKV_AWS_145:SSE-S3 で暗号化する。KMS のキーの料金を抑えるため(DOC-03 9.1)
   #checkov:skip=CKV_AWS_18:検索結果のバケットのアクセスログは取らない(Athena の操作は CloudTrail に残る)

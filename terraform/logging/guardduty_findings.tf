@@ -39,7 +39,7 @@ resource "aws_cloudwatch_event_bus_policy" "log_events" {
 }
 
 # ---- security:検知を log-archive のバスに転送する ----
-# 信頼ポリシーは、この転送ルールからの引き受けだけに絞る(L-1)
+# 信頼ポリシーは、この転送ルールからの引き受けだけに絞る(ほかのルールやサービスから引き受けられないように)
 data "aws_iam_policy_document" "events_trust" {
   statement {
     actions = ["sts:AssumeRole"]

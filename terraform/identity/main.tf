@@ -197,12 +197,20 @@ locals {
       group  = "g-developer"
       tag    = "developer"
     }
+    # 外部委託者は契約の終了日(expires)を書く(FR-ID-06、DOC-03 5.3)。その日の 0 時(日本時間)から使えなくなる
     "t-contractor" = {
-      given  = "委託"
-      family = "検証"
-      group  = "g-contractor"
-      tag    = "contractor"
+      given   = "委託"
+      family  = "検証"
+      group   = "g-contractor"
+      tag     = "contractor"
+      expires = "2027-03-31"
     }
+  }
+
+  # 期限を過ぎた人は、グループの所属を作らない(期限切れの Lambda が外したあとに、Terraform が作り直さないため)
+  active_test_users = {
+    for k, v in local.test_users : k => v
+    if try(v.expires, null) == null || timecmp(plantimestamp(), "${try(v.expires, "2999-12-31")}T00:00:00+09:00") < 0
   }
 }
 
@@ -223,10 +231,18 @@ resource "aws_identitystore_user" "test" {
     primary = true
     type    = "work"
   }
+
+  lifecycle {
+    # 期限(expires)を書けるのは外部委託者(g-contractor)だけ。形は YYYY-MM-DD。書き間違いで期限が効かないのを防ぐ
+    precondition {
+      condition     = try(each.value.expires, null) == null || (each.value.group == "g-contractor" && can(regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", try(each.value.expires, ""))))
+      error_message = "expires は g-contractor の利用者にだけ、YYYY-MM-DD の形で書いてください。"
+    }
+  }
 }
 
 resource "aws_identitystore_group_membership" "test" {
-  for_each = local.test_users
+  for_each = local.active_test_users
 
   identity_store_id = local.identity_store_id
   group_id          = aws_identitystore_group.this[each.value.group].group_id
